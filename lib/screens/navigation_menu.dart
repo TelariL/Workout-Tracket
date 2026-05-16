@@ -1,66 +1,108 @@
 import 'package:flutter/material.dart';
 import 'training_screen.dart';
-import 'settings_screen.dart';
 import 'profile_screen.dart';
+import 'settings_screen.dart';
 
 class NavigationMenu extends StatefulWidget {
-  final int initialIndex;
-
-  const NavigationMenu({super.key, this.initialIndex = 0});
+  const NavigationMenu({super.key});
 
   @override
   State<NavigationMenu> createState() => _NavigationMenuState();
 }
 
 class _NavigationMenuState extends State<NavigationMenu> {
-  late int _selectedIndex;
+  int index = 0;
+  final profileKey = GlobalKey<ProfileScreenState>();
 
-  final List<Widget> _pages = [
-    TrainingScreen(),
-    ProfileScreen(),
-    SettingsScreen(),
+  final keys = [
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _selectedIndex = widget.initialIndex;
+  Widget _buildNavigator(GlobalKey<NavigatorState> key, Widget page) {
+    return Navigator(
+      key: key,
+      onGenerateRoute: (_) =>
+          MaterialPageRoute(builder: (_) => page),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
-      ),
-      bottomNavigationBar: _buildBottomNavBar(),
-    );
-  }
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
 
-  Widget _buildBottomNavBar() {
-    return BottomNavigationBar(
-      backgroundColor: Colors.white,
-      currentIndex: _selectedIndex,
-      onTap: (index) {
-        setState(() {
-          _selectedIndex = index;
-        });
+        final navigator = keys[index].currentState!;
+
+        if (navigator.canPop()) {
+          navigator.pop();
+          return;
+        }
+
+        if (index != 0) {
+          setState(() {
+            index = 0;
+          });
+          return;
+        }
       },
-      items: [
-        BottomNavigationBarItem(
-          icon: Image.asset('assets/icons/list_icon.png', width: 31),
-          label: "",
+
+      child: Scaffold(
+        body: IndexedStack(
+          index: index,
+          children: [
+            _buildNavigator(keys[0], const TrainingScreen()),
+            _buildNavigator(
+              keys[1],
+              ProfileScreen(key: profileKey),
+            ),
+            _buildNavigator(keys[2], const SettingsScreen()),
+          ],
         ),
-        BottomNavigationBarItem(
-          icon: Image.asset('assets/icons/profile_icon.png', width: 31),
-          label: "",
+
+        bottomNavigationBar: BottomNavigationBar(
+          backgroundColor: Colors.white,
+          currentIndex: index,
+          onTap: (i) {
+            if (i == index) {
+              keys[i].currentState?.popUntil((route) => route.isFirst);
+            } else {
+              setState(() {
+                index = i;
+              });
+
+              if (i == 1) {
+                profileKey.currentState?.refreshProfile();
+              }
+            }
+          },
+          items: [
+            BottomNavigationBarItem(
+              icon: Image.asset(
+                'assets/icons/list_icon.png',
+                width: 31,
+              ),
+              label: "",
+            ),
+            BottomNavigationBarItem(
+              icon: Image.asset(
+                'assets/icons/profile_icon.png',
+                width: 31,
+              ),
+              label: "",
+            ),
+            BottomNavigationBarItem(
+              icon: Image.asset(
+                'assets/icons/settings_icon.png',
+                width: 31,
+              ),
+              label: "",
+            ),
+          ],
         ),
-        BottomNavigationBarItem(
-          icon: Image.asset('assets/icons/settings_icon.png', width: 31),
-          label: "",
-        ),
-      ],
+      ),
     );
   }
 }

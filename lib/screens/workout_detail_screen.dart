@@ -5,7 +5,8 @@ import '../database/app_database.dart';
 import '../repository/training_repository.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'exercise_stats_screen.dart';
-import 'navigation_menu.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:intl/intl.dart';
 
 class WorkoutDetailScreen extends StatefulWidget {
   final Workout workout;
@@ -18,6 +19,7 @@ class WorkoutDetailScreen extends StatefulWidget {
 
 class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   final db = AppDatabase.instance;
+  late Workout workout;
   late TrainingRepository repo;
 
   List<Map<String, dynamic>> exercisesWithNames = [];
@@ -26,24 +28,100 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   void initState() {
     super.initState();
     repo = TrainingRepository(db);
+    workout = widget.workout;
     _load();
   }
 
   Future<void> _load() async {
-    final workoutExercises = await repo.getWorkoutExercises(widget.workout.id);
+    final workoutExercises = await repo.getWorkoutExercises(workout.id);
 
-    exercisesWithNames = [];
+    final exList = await repo.getExercises();
 
-    for (var we in workoutExercises) {
-      final exList = await repo.getExercises();
+    exercisesWithNames = workoutExercises.map((we) {
       final exercise = exList.firstWhere((e) => e.id == we.exerciseId);
-      exercisesWithNames.add({
+      return {
         "workoutExercise": we,
         "exercise": exercise,
-      });
-    }
+      };
+    }).toList();
 
     setState(() {});
+  }
+
+  Future<void> _loadWorkout() async {
+    final updated = await repo.getWorkoutById(workout.id);
+
+    setState(() {
+      workout = updated;
+    });
+  }
+
+  Workout copyWorkout({
+    int? id,
+    String? name,
+    DateTime? date,
+  }) {
+    return Workout(
+      id: id ?? workout.id,
+      name: name ?? workout.name,
+      date: date ?? workout.date,
+    );
+  }
+
+  Future<void> _editWorkoutDate() async {
+    DateTime tempDate = workout.date;
+
+    await showCupertinoModalPopup(
+      context: context,
+      builder: (ctx) {
+        return Container(
+          height: 370,
+          color: Colors.white,
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: CupertinoButton(
+                  child: Text(
+                    "Готово",
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF363636),
+                    ),
+                  ),
+                  onPressed: () async {
+                    await repo.updateWorkoutDate(
+                      workout.id,
+                      tempDate,
+                    );
+
+                    if (!mounted) return;
+
+                    Navigator.of(ctx).pop();
+
+                    await _loadWorkout();
+                  },
+                ),
+              ),
+
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.date,
+                  initialDateTime: workout.date,
+                  minimumDate: DateTime(2020),
+                  maximumDate: DateTime(2100),
+                  onDateTimeChanged: (date) {
+                    tempDate = date;
+                  },
+                ),
+              ),
+              SizedBox(height: 50,)
+            ],
+          ),
+        );
+      },
+    );
   }
 
   String _formatDate(DateTime date) {
@@ -164,7 +242,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                   child: Text("Добавить подход", style: GoogleFonts.inter(fontSize: 18, color: Colors.white)),
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 0),
             ],
           ),
         );
@@ -173,7 +251,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   }
 
   Future<void> _editWorkoutName() async {
-    final controller = TextEditingController(text: widget.workout.name);
+    final controller = TextEditingController(text: workout.name);
 
     await showModalBottomSheet(
       context: context,
@@ -237,22 +315,22 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                   onPressed: () async {
                     final newName = controller.text.trim();
 
-                    if (newName.isNotEmpty) {
-                      await repo.updateWorkoutName(
-                        widget.workout.id,
-                        newName,
-                      );
+                    if (newName.isEmpty) return;
 
-                      Navigator.pop(context);
-                      _load(); // обновляем экран
-                    }
+                    await repo.updateWorkoutName(workout.id, newName);
+
+                    if (!mounted) return;
+
+                    Navigator.pop(context);
+
+                    await _loadWorkout();
                   },
                   style: ElevatedButton.styleFrom(
-                    elevation: 0,
                     backgroundColor: const Color(0xFF363636),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),
+                    elevation: 0,
                   ),
                   child: Text(
                     "Сохранить",
@@ -280,19 +358,15 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
+
         title: GestureDetector(
           onTap: _editWorkoutName,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                widget.workout.name,
-                style: GoogleFonts.inter(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+          child: Text(
+            workout.name,
+            style: GoogleFonts.inter(
+              color: Colors.black,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),
@@ -300,10 +374,16 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Text(
-              _formatDate(widget.workout.date),
-              style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF878787)),
+            padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 8),
+            child: GestureDetector(
+              onTap: _editWorkoutDate,
+              child: Text(
+                _formatDate(workout.date),
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: const Color(0xFF878787),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -331,8 +411,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                     expand: false,
                     backgroundColor: Colors.white,
                     topRadius: const Radius.circular(16),
-                    builder: (context) => ExercisesScreen(),
+                    builder: (_) => ExercisesScreen(),
                   );
+
                   if (exercise != null) {
                     await repo.addExerciseToWorkout(
                       workoutId: widget.workout.id,
@@ -357,58 +438,10 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
-        currentIndex: 0,
-        onTap: (index) {
-          if (index == 0) {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const NavigationMenu(initialIndex: 0),
-              ),
-                  (route) => false,
-            );
-          }
 
-          if (index == 1) {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const NavigationMenu(initialIndex: 1),
-              ),
-                  (route) => false,
-            );
-          }
-
-          if (index == 2) {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const NavigationMenu(initialIndex: 2),
-              ),
-                  (route) => false,
-            );
-          }
-        },
-        items: [
-          BottomNavigationBarItem(
-            icon: Image.asset('assets/icons/list_icon.png', width: 31),
-            label: "",
-          ),
-          BottomNavigationBarItem(
-            icon: Image.asset('assets/icons/profile_icon.png', width: 31),
-            label: "",
-          ),
-          BottomNavigationBarItem(
-            icon: Image.asset('assets/icons/settings_icon.png', width: 31),
-            label: "",
-          ),
-        ],
-      ),
     );
   }
 

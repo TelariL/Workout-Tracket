@@ -2,8 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+import 'package:intl/intl.dart';
+
 import '../database/app_database.dart';
 import '../repository/training_repository.dart';
+
+class ChartPoint {
+  final DateTime date;
+  final double value;
+
+  ChartPoint(this.date, this.value);
+}
 
 class ExerciseStatsScreen extends StatefulWidget {
   final Exercise exercise;
@@ -32,6 +41,127 @@ class _ExerciseStatsScreenState extends State<ExerciseStatsScreen> {
   Future<void> _load() async {
     final data = await repo.getExerciseStats(widget.exercise.id);
     setState(() => stats = data);
+  }
+
+  List<ChartPoint> _aggregate(
+      List<Map<String, dynamic>> data,
+      String key,
+      String range,
+      ) {
+    if (data.isEmpty) return [];
+
+    Map<DateTime, List<double>> buckets = {};
+
+    DateTime bucketKey;
+
+    for (final e in data) {
+      final date = e['date'] as DateTime;
+      final value = (e[key] as num?)?.toDouble() ?? 0;
+
+      switch (range) {
+
+      /// день
+        case "week":
+        case "month":
+          bucketKey = DateTime(
+            date.year,
+            date.month,
+            date.day,
+          );
+          break;
+
+      /// неделя
+        case "3m":
+        case "6m":
+          final weekStart =
+          date.subtract(Duration(days: date.weekday - 1));
+
+          bucketKey = DateTime(
+            weekStart.year,
+            weekStart.month,
+            weekStart.day,
+          );
+          break;
+
+      /// месяц
+        case "year":
+        case "all":
+          bucketKey = DateTime(
+            date.year,
+            date.month,
+          );
+          break;
+
+        default:
+          bucketKey = DateTime(
+            date.year,
+            date.month,
+            date.day,
+          );
+      }
+
+      buckets.putIfAbsent(bucketKey, () => []);
+      buckets[bucketKey]!.add(value);
+    }
+
+    final result = buckets.entries.map((entry) {
+      final values = entry.value;
+
+      final avg =
+          values.reduce((a, b) => a + b) / values.length;
+
+      return ChartPoint(entry.key, avg);
+    }).toList();
+
+    result.sort((a, b) => a.date.compareTo(b.date));
+
+    /// максимум 9 точек
+    if (result.length > 9) {
+      final step = result.length / 9;
+
+      List<ChartPoint> reduced = [];
+
+      for (int i = 0; i < 9; i++) {
+        final index = (i * step).floor();
+
+        reduced.add(result[index]);
+      }
+
+      return reduced;
+    }
+
+    return result;
+  }
+
+  List<FlSpot> _spotsFromPoints(List<ChartPoint> data) {
+    return List.generate(data.length, (i) {
+      return FlSpot(
+        i.toDouble(),
+        data[i].value,
+      );
+    });
+  }
+
+  List<String> _datesFromPoints(
+      List<ChartPoint> data,
+      String range,
+      ) {
+
+    return data.map((e) {
+
+      switch (range) {
+
+      /// только месяц
+        case "year":
+        case "all":
+          return DateFormat("MMM", "ru").format(e.date);
+
+      /// день + месяц
+        default:
+          return DateFormat("d MMM", "ru").format(e.date);
+      }
+
+    }).toList();
   }
 
   List<Map<String, dynamic>> _filter(String range) {
@@ -77,9 +207,11 @@ class _ExerciseStatsScreenState extends State<ExerciseStatsScreen> {
   }
 
   List<String> _dates(List<Map<String, dynamic>> data) {
+    final formatter = DateFormat("d MMM", "ru");
+
     return data.map((e) {
       final d = e['date'] as DateTime;
-      return "${d.day}.${d.month}";
+      return formatter.format(d);
     }).toList();
   }
 
@@ -144,19 +276,14 @@ class _ExerciseStatsScreenState extends State<ExerciseStatsScreen> {
     required String range,
     required Function(String) onRangeChanged,
   }) {
-    if (spots.isEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: GoogleFonts.inter(fontSize: 16)),
-          const SizedBox(height: 8),
-          const Center(child: Text("Нет данных")),
-        ],
-      );
-    }
 
-    final maxYRaw = spots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
-    final minYRaw = spots.map((e) => e.y).reduce((a, b) => a < b ? a : b);
+    final maxYRaw = spots.isEmpty
+        ? 0.0
+        : spots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
+
+    final minYRaw = spots.isEmpty
+        ? 0.0
+        : spots.map((e) => e.y).reduce((a, b) => a < b ? a : b);
 
     final yPadding = (maxYRaw - minYRaw) * 0.15;
 
@@ -169,7 +296,7 @@ class _ExerciseStatsScreenState extends State<ExerciseStatsScreen> {
     final fixedMinY = (minY / yStep).floor() * yStep;
     final fixedMaxY = (maxY / yStep).ceil() * yStep;
 
-    final maxX = (spots.length - 1).toDouble();
+    final maxX = spots.isEmpty ? 1.0 : (spots.length - 1).toDouble();
     const xPadding = 0.3;
 
     return Column(
@@ -304,7 +431,7 @@ class _ExerciseStatsScreenState extends State<ExerciseStatsScreen> {
                         sideTitles: SideTitles(
                           showTitles: true,
                           reservedSize: 32,
-                          interval: (spots.length / 4).ceilToDouble(),
+                          interval: spots.length <= 1 ? 1 : (spots.length / 4).ceilToDouble(),
                           getTitlesWidget: (value, meta) {
                             final i = value.round();
 
@@ -338,7 +465,7 @@ class _ExerciseStatsScreenState extends State<ExerciseStatsScreen> {
 
                     lineBarsData: [
                       LineChartBarData(
-                        spots: spots,
+                        spots: spots.isEmpty ? [FlSpot(0, 0)] : spots,
                         isCurved: true,
                         barWidth: 3,
                         color: const Color(0xFF363636),
@@ -440,8 +567,22 @@ class _ExerciseStatsScreenState extends State<ExerciseStatsScreen> {
         children: [
           _chart(
             title: "Динамика объема",
-            spots: _spots(volumeData, "volume"),
-            dates: _dates(volumeData),
+            spots: _spotsFromPoints(
+              _aggregate(
+                volumeData,
+                "volume",
+                volumeRange,
+              ),
+            ),
+
+            dates: _datesFromPoints(
+              _aggregate(
+                volumeData,
+                "volume",
+                volumeRange,
+              ),
+              volumeRange,
+            ),
             range: volumeRange,
             onRangeChanged: (v) =>
                 setState(() => volumeRange = v),
@@ -449,8 +590,22 @@ class _ExerciseStatsScreenState extends State<ExerciseStatsScreen> {
           const SizedBox(height: 20),
           _chart(
             title: "Динамика среднего веса",
-            spots: _spots(weightData, "avgWeight"),
-            dates: _dates(weightData),
+            spots: _spotsFromPoints(
+              _aggregate(
+                weightData,
+                "avgWeight",
+                weightRange,
+              ),
+            ),
+
+            dates: _datesFromPoints(
+              _aggregate(
+                weightData,
+                "avgWeight",
+                weightRange,
+              ),
+              weightRange,
+            ),
             range: weightRange,
             onRangeChanged: (v) =>
                 setState(() => weightRange = v),

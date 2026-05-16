@@ -105,7 +105,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
 
               SizedBox(
                 width: double.infinity,
-                height: 50,
+                height: 55,
                 child: ElevatedButton(
                   onPressed: () async {
                     final name = nameController.text.trim();
@@ -140,7 +140,6 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
                 ),
               ),
 
-              const SizedBox(height: 30),
             ],
           ),
         );
@@ -263,8 +262,8 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: SizedBox(
-                width: double.infinity,
-                height: 50,
+                width: 317,
+                height: 60,
                 child: ElevatedButton(
                   onPressed: _showCreateExerciseSheet,
                   style: ButtonStyle(
@@ -283,13 +282,15 @@ class _ExercisesScreenState extends State<ExercisesScreen> {
                   child: Text(
                     "Создать упражнение",
                     style: GoogleFonts.inter(
-                      fontSize: 16,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
                       color: const Color(0xFF363636),
                     ),
                   ),
                 ),
               ),
             ),
+            SizedBox(height: 8,)
           ],
         ),
       ),

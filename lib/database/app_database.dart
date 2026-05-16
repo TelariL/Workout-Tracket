@@ -7,6 +7,37 @@ import 'package:path/path.dart' as p;
 part 'app_database.g.dart';
 
 
+/// ================= PATTERNS ++++++++++++++++
+class Templates extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text()();
+}
+
+class TemplateExercises extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get templateId =>
+      integer().references(Templates, #id)();
+
+  IntColumn get exerciseId =>
+      integer().references(Exercises, #id)();
+
+  IntColumn get order => integer()();
+}
+
+class TemplateSets extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get templateExerciseId =>
+      integer().references(TemplateExercises, #id)();
+
+  IntColumn get reps => integer().nullable()();
+  RealColumn get weight => real().nullable()();
+  IntColumn get restSeconds => integer().nullable()();
+
+  IntColumn get order => integer()();
+}
+
 
 /// ================= WORKOUTS =================
 
@@ -58,8 +89,31 @@ class WorkoutSets extends Table {
   IntColumn get restSeconds => integer().nullable()();
 }
 
+/// ================= BodyMetrics
+
+class BodyMetrics extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get name => text()();
+}
+
+class BodyMetricEntries extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get metricId => integer()();
+
+  RealColumn get value => real()();
+
+  DateTimeColumn get date => dateTime()();
+}
+
 @DriftDatabase(
   tables: [
+    Templates,
+    TemplateExercises,
+    TemplateSets,
+    BodyMetrics,
+    BodyMetricEntries,
     Workouts,
     Exercises,
     WorkoutExercises,
@@ -74,7 +128,42 @@ class AppDatabase extends _$AppDatabase {
   factory AppDatabase() => instance;
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 5;
+
+  /// =================Body
+
+  Future<void> _insertDefaultMetrics() async {
+    final items = [
+      'Масса тела',
+      'Обхват груди',
+      'Обхват талии',
+      'Обхват бедер',
+      'Обхват бицепса',
+      'Обхват предплечья',
+    ];
+
+    for (final item in items) {
+      await into(bodyMetrics).insert(
+        BodyMetricsCompanion.insert(name: item),
+      );
+    }
+  }
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) async {
+      await m.createAll();
+      await _insertDefaultMetrics();
+    },
+
+    onUpgrade: (m, from, to) async {
+      if (from < 3) {
+        await m.createAll();
+        await _insertDefaultMetrics();
+      }
+    },
+  );
+
 
   /// ================= WORKOUTS =================
 
@@ -86,6 +175,21 @@ class AppDatabase extends _$AppDatabase {
 
   Future deleteWorkout(int id) =>
       (delete(workouts)..where((w) => w.id.equals(id))).go();
+
+  Future<void> updateWorkoutDate(
+      int workoutId,
+      DateTime date,
+      ) async {
+    await (update(workouts)
+      ..where((t) => t.id.equals(workoutId)))
+        .write(
+      WorkoutsCompanion(
+        date: Value(date),
+      ),
+    );
+  }
+
+
 
   /// ================= EXERCISES =================
 

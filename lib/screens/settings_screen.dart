@@ -4,7 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:workout_tracker/screens/welcome_screen.dart';
 import 'login_screen.dart';
-
+import 'goals_screen.dart';
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -16,6 +17,37 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool isDarkTheme = false;
   bool notifications = false;
+
+  double? targetWeight;
+  double? targetBench;
+  double? targetSquat;
+  double? targetDeadlift;
+
+  String weightGoalType = "gain";
+  String profileGoal = "bench";
+
+  Future<void> _loadGoals() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    setState(() {
+      targetWeight = prefs.getDouble("targetWeight");
+      targetBench = prefs.getDouble("targetBench");
+      targetSquat = prefs.getDouble("targetSquat");
+      targetDeadlift = prefs.getDouble("targetDeadlift");
+
+      profileGoal =
+          prefs.getString("profileGoal") ?? "bench";
+
+      weightGoalType =
+          prefs.getString("weightGoalType") ?? "gain";
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGoals();
+  }
 
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
@@ -32,18 +64,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 40,
+          ),
+
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+
               Text(
                 "Настройки",
                 style: GoogleFonts.inter(
                   fontSize: 32,
                   fontWeight: FontWeight.w700,
-                  color: Colors.black
+                  color: Colors.black,
                 ),
               ),
 
@@ -56,7 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF878787),
+                    color: const Color(0xFF878787),
                   ),
                 ),
               ),
@@ -70,29 +108,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Padding(
                 padding: const EdgeInsets.only(left: 20),
                 child: Text(
-                  "МОИ ДАННЫЕ",
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF878787),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              _myData(context),
-
-              const SizedBox(height: 20),
-
-              Padding(
-                padding: const EdgeInsets.only(left: 20),
-                child: Text(
                   "НАСТРОЙКА ПРИЛОЖЕНИЯ",
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF878787),
+                    color: const Color(0xFF878787),
                   ),
                 ),
               ),
@@ -107,28 +127,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: SizedBox(
                   width: 317,
                   height: 49,
+
                   child: ElevatedButton(
                     onPressed: () async {
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.setBool('isLoggedIn', false);
 
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                      final prefs =
+                      await SharedPreferences.getInstance();
+
+                      await prefs.setBool(
+                        'isLoggedIn',
+                        false,
+                      );
+
+                      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (_) => const WelcomeScreen(),
+                        ),
+                            (route) => false,
                       );
                     },
+
                     style: ButtonStyle(
-                      elevation: MaterialStateProperty.all(0),
-                      backgroundColor: MaterialStateProperty.all(Colors.white),
+                      elevation:
+                      MaterialStateProperty.all(0),
+
+                      backgroundColor:
+                      MaterialStateProperty.all(
+                        Colors.white,
+                      ),
+
                       shape: MaterialStateProperty.all(
                         RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
+                          borderRadius:
+                          BorderRadius.circular(15),
                         ),
                       ),
+
                       side: MaterialStateProperty.all(
-                        const BorderSide(color: Color(0xFF363636), width: 1),
+                        const BorderSide(
+                          color: Color(0xFF363636),
+                          width: 1,
+                        ),
                       ),
                     ),
+
                     child: Text(
                       'Выйти из аккаунта',
                       style: GoogleFonts.inter(
@@ -152,18 +194,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _usefulInformation(BuildContext context) {
     return Container(
       height: 98,
+
       decoration: BoxDecoration(
         color: const Color(0xFFF0F0F0),
         borderRadius: BorderRadius.circular(15),
       ),
+
       child: Column(
         children: [
+
           _menuItem(
             context: context,
             text: "Что нового в этом обновлении?",
             onTap: () {},
           ),
+
           _divider(),
+
           _menuItem(
             context: context,
             text: "Служба поддержки",
@@ -174,46 +221,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _myData(BuildContext context) {
-    return Container(
-      height: 98,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F0F0),
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Column(
-        children: [
-          _menuItem(
-            context: context,
-            text: "Имя",
-            onTap: () {},
-          ),
-          _divider(),
-          _menuItem(
-            context: context,
-            text: "Мои цели",
-            onTap: () {},
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _settings(BuildContext context) {
     return Container(
       height: 98,
+
       decoration: BoxDecoration(
         color: const Color(0xFFF0F0F0),
         borderRadius: BorderRadius.circular(15),
       ),
+
       child: Column(
         children: [
+
           _switchItem(
             context: context,
             text: "Тема",
             value: isDarkTheme,
+
             onChanged: (val) {
-              setState(() => isDarkTheme = val);
+              setState(() {
+                isDarkTheme = val;
+              });
             },
           ),
 
@@ -223,8 +251,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             context: context,
             text: "Уведомления",
             value: notifications,
+
             onChanged: (val) {
-              setState(() => notifications = val);
+              setState(() {
+                notifications = val;
+              });
             },
           ),
         ],
@@ -237,24 +268,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String text,
     required VoidCallback onTap,
   }) {
+
     return GestureDetector(
       onTap: onTap,
+
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        padding: const EdgeInsets.symmetric(
+          vertical: 12,
+          horizontal: 16,
+        ),
+
         child: Row(
           children: [
+
             const SizedBox(width: 4),
+
             Expanded(
               child: Text(
                 text,
                 style: GoogleFonts.inter(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF363636),
+                  color: const Color(0xFF363636),
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right, size: 24, color: Color(0xFF878787)),
+
+            const Icon(
+              Icons.chevron_right,
+              size: 24,
+              color: Color(0xFF878787),
+            ),
           ],
         ),
       ),
@@ -267,11 +311,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
+
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 16),
+      padding: const EdgeInsets.symmetric(
+        vertical: 5,
+        horizontal: 16,
+      ),
+
       child: Row(
         children: [
+
           const SizedBox(width: 4),
+
           Expanded(
             child: Text(
               text,
@@ -292,11 +343,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-
-
   static Widget _divider() {
     return const Padding(
       padding: EdgeInsets.only(left: 20),
+
       child: Divider(
         thickness: 1,
         height: 0,
@@ -305,4 +355,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
-

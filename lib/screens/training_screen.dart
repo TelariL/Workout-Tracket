@@ -3,9 +3,9 @@ import '../repository/training_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:collection';
-import 'create_workout_sheet.dart';
 import 'workout_detail_screen.dart';
-
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
+import 'workout_creation_sheet.dart';
 
 class TrainingScreen extends StatefulWidget {
   const TrainingScreen({super.key});
@@ -76,7 +76,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 40),
 
             Padding(
               padding: const EdgeInsets.only(left: 20),
@@ -104,36 +104,39 @@ class _TrainingScreenState extends State<TrainingScreen> {
               ),
             ),
 
+            const SizedBox(height: 20),
+
             Center(
               child: SizedBox(
                 width: 317,
                 height: 60,
                 child: ElevatedButton(
-                  onPressed: () async {
-                    final result = await showModalBottomSheet<Map>(
+                  onPressed: () {
+                    showCupertinoModalBottomSheet(
                       context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => const CreateWorkoutSheet(),
-                    );
+                      useRootNavigator: false,
+                      expand: false,
+                      backgroundColor: Colors.white,
+                      topRadius: const Radius.circular(16),
 
-                    if (result != null && result.isNotEmpty) {
-                      await repo.createWorkout(
-                        name: result["name"],
-                        date: result["date"],
-                      );
-
+                      builder: (_) =>
+                      const WorkoutCreationSheet(),
+                    ).then((_) {
                       _loadTrainings();
-                    }
+                    });
                   },
+
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
-                      side: const BorderSide(color: Color(0xFF363636)),
+                      side: const BorderSide(
+                        color: Color(0xFF363636),
+                      ),
                     ),
                   ),
+
                   child: Text(
                     "Добавить тренировку",
                     style: GoogleFonts.inter(
@@ -221,13 +224,14 @@ class _TrainingScreenState extends State<TrainingScreen> {
           _loadTrainings();
         },
         child: GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
+          onTap: () async {
+            await Navigator.of(context).push(
+              MaterialWithModalsPageRoute(
                 builder: (_) => WorkoutDetailScreen(workout: t),
               ),
             );
+
+            _loadTrainings();
           },
           child: Container(
             color: const Color(0xFFF0F0F0),
